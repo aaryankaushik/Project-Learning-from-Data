@@ -1,0 +1,436 @@
+---
+title: "GROUP 1 RMD"
+output:
+  word_document: default
+  pdf_document:
+    number_sections: yes
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(car)
+library(carData)
+library(datasets)
+library(dplyr)
+library(forcats)
+library(ggplot2)
+library(methods)
+library(purrr)
+library(readr)
+library(stats)
+library(stringr)
+library(tidyr)
+library(tidyverse)
+library(utils)
+```
+
+
+
+```{r include=FALSE}
+data_fev<-read.csv("FullData_OC.csv",TRUE,sep=";")
+```
+```{r include=FALSE}
+#convert variables ,(comma) to .(decimal)
+new_FEV<-gsub(",",".",data_fev$FEV)
+new_height<-gsub(",",".",data_fev$height)
+new_BMI<-gsub(",",".",data_fev$BMI)
+new_SES<-gsub("Middle","middle",data_fev$SES)
+SES<-gsub("High","high",new_SES)
+
+#then convert char to numeric
+FEV<-as.numeric(new_FEV)
+height<-as.numeric(new_height)
+BMI<-as.numeric(new_BMI)
+
+#removing old char variables from original data set
+data_fev<-subset(data_fev,select = -c(FEV,height,BMI,SES))
+
+#adding updated variables in data set
+data_fev<-data.frame(FEV,height,BMI,SES,data_fev)
+
+#removing row 19 which contain height 150m and row 29 which contain lungdisease 2
+data_fev <- data_fev[-c(19,29), ]
+
+#checking missing values
+library(skimr)
+skim(data_fev)
+```
+
+## Missig Vakues
+```{r echo=FALSE}
+library(naniar)
+vis_miss(data_fev)
+```
+
+```{r include=FALSE}
+#the dataset
+head(data_fev)
+#codding of factor variables
+library(tidyverse)
+library(dplyr)
+fev <- data_fev %>%
+  mutate(Gender = as.factor(Gender)) %>%
+  mutate(Smoke = as.factor(Smoke)) %>%
+  mutate(height)
+
+
+```
+
+## Exploratory Data Analysis
+
+```{r echo=FALSE, warning=FALSE}
+#exploratory data analysis
+```
+
+```{r echo=FALSE, warning=FALSE}
+library(ggplot2)
+
+fev %>%
+  ggplot(aes(x=Smoke,y=FEV,fill=Smoke)) +
+  scale_fill_manual(values=c("dimgrey","firebrick")) +
+  theme_bw()+
+  geom_boxplot(outlier.shape=NA) + 
+  geom_jitter(width = 0.2, size=0.1)+
+  ylab("FEV") +
+  xlab("smoking status")
+```
+
+```{r echo=FALSE, warning=FALSE}
+```
+
+In order to visualize the association between predictors and outcome variables the scatter plot is presented below. From scatter plot, we visualize that the FEV variable is highly correlated with age and height.
+```{r echo=FALSE, warning=FALSE}
+library(GGally)
+data_fev %>% select(Age,Gender,height,Smoke, Sport, T1D, LungDisease, FEV) %>% 
+ggpairs()
+```
+From scatter plot, we visualize that the fev variable is highly correlated with age and height. So, let's explore these variabes.
+
+```{r echo=FALSE}
+#BoxPlot of FEV vs Smoking stratified on age
+fev%>%
+  ggplot(aes(x=as.factor(Age),y=FEV,fill=Smoke)) +
+  geom_boxplot(outlier.shape=NA) +
+  geom_point(width = 0.2, size = 0.1, position = position_jitterdodge()) +
+  theme_bw() +
+  scale_fill_manual(values=c("dimgrey", "firebrick")) +
+  ylab("fev") +
+  xlab("smoking status")
+```
+
+indicated that the effect smokers on FEV as compared to non-smoker subjects by adjusting age of the individuals. So, age may be considered as a cofounder for the relation ship between smoking and FEV.
+```{r echo=FALSE}
+#BoxPlot of FEV vs height 
+fev %>%
+  ggplot(aes(x=height,y=FEV,color=Smoke)) +
+  geom_point() +
+  scale_color_manual(values=c("dimgrey", "firebrick")) +
+  theme_bw() +
+  ylab("fev (l)") +
+  xlab("height (m)")
+```
+
+## Unadjusted Analysis
+
+```{r}
+m<-lm(FEV~Smoke,data=data_fev)
+summary(m)
+```
+
+## Model Selection
+```{r include = FALSE} 
+#model selection step 1
+m.age<-lm(FEV~Smoke+Age, data=data_fev)
+mean((m.age$residuals/(1-influence(m.age)$h))^2)
+
+m.gender<-lm(FEV~Smoke+Gender, data=data_fev)
+mean((m.gender$residuals/(1-influence(m.gender)$h))^2)
+
+m.height<-lm(FEV~Smoke+height, data=data_fev)
+mean((m.height$residuals/(1-influence(m.height)$h))^2)
+
+m.bmi<-lm(FEV~Smoke+BMI, data=data_fev)
+mean((m.bmi$residuals/(1-influence(m.bmi)$h))^2)
+
+m.sport<-lm(FEV~Smoke+Sport, data=data_fev)
+mean((m.gender$residuals/(1-influence(m.gender)$h))^2)
+
+m.result<-lm(FEV~Smoke+SchoolResults, data=data_fev)
+mean((m.result$residuals/(1-influence(m.result)$h))^2)
+
+m.td<-lm(FEV~Smoke+T1D, data=data_fev)
+mean((m.td$residuals/(1-influence(m.td)$h))^2)
+
+m.colorblind<-lm(FEV~Smoke+ColorBlind, data=data_fev)
+mean((m.colorblind$residuals/(1-influence(m.colorblind)$h))^2)
+
+m.sportdays<-lm(FEV~Smoke+SportDays, data=data_fev)
+mean((m.sportdays$residuals/(1-influence(m.sportdays)$h))^2)
+
+m.lungdisease<-lm(FEV~Smoke+LungDisease, data=data_fev)
+mean((m.lungdisease$residuals/(1-influence(m.lungdisease)$h))^2)
+
+# smoke+height= 0.1766641
+#model selection step 2
+m.age<-lm(FEV~Smoke+height+Age, data=data_fev)
+mean((m.age$residuals/(1-influence(m.age)$h))^2)
+
+m.gender<-lm(FEV~Smoke+height+Gender, data=data_fev)
+mean((m.gender$residuals/(1-influence(m.gender)$h))^2)
+
+m.bmi<-lm(FEV~Smoke+height+BMI, data=data_fev)
+mean((m.bmi$residuals/(1-influence(m.bmi)$h))^2)
+
+m.sport<-lm(FEV~Smoke+height+Sport, data=data_fev)
+mean((m.gender$residuals/(1-influence(m.gender)$h))^2)
+
+m.result<-lm(FEV~Smoke+height+SchoolResults, data=data_fev)
+mean((m.result$residuals/(1-influence(m.result)$h))^2)
+
+m.td<-lm(FEV~Smoke+height+T1D, data=data_fev)
+mean((m.td$residuals/(1-influence(m.td)$h))^2)
+
+m.colorblind<-lm(FEV~Smoke+height+ColorBlind, data=data_fev)
+mean((m.colorblind$residuals/(1-influence(m.colorblind)$h))^2)
+
+m.sportdays<-lm(FEV~Smoke+height+SportDays, data=data_fev)
+mean((m.sportdays$residuals/(1-influence(m.sportdays)$h))^2)
+
+m.lungdisease<-lm(FEV~Smoke+height+LungDisease, data=data_fev)
+mean((m.lungdisease$residuals/(1-influence(m.lungdisease)$h))^2)
+
+# smoke+height+AGE=0.1702385
+#model selection step 3
+
+m.gender<-lm(FEV~Smoke+height+Age+Gender, data=data_fev)
+mean((m.gender$residuals/(1-influence(m.gender)$h))^2)
+
+m.bmi<-lm(FEV~Smoke+height+Age+BMI, data=data_fev)
+mean((m.bmi$residuals/(1-influence(m.bmi)$h))^2)
+
+m.sport<-lm(FEV~Smoke+height+Age+Sport, data=data_fev)
+mean((m.gender$residuals/(1-influence(m.gender)$h))^2)
+
+m.result<-lm(FEV~Smoke+height+Age+SchoolResults, data=data_fev)
+mean((m.result$residuals/(1-influence(m.result)$h))^2)
+
+m.td<-lm(FEV~Smoke+height+Age+T1D, data=data_fev)
+mean((m.td$residuals/(1-influence(m.td)$h))^2)
+
+m.colorblind<-lm(FEV~Smoke+height+Age+ColorBlind, data=data_fev)
+mean((m.colorblind$residuals/(1-influence(m.colorblind)$h))^2)
+
+m.sportdays<-lm(FEV~Smoke+height+Age+SportDays, data=data_fev)
+mean((m.sportdays$residuals/(1-influence(m.sportdays)$h))^2)
+
+m.lungdisease<-lm(FEV~Smoke+height+Age+LungDisease, data=data_fev)
+mean((m.lungdisease$residuals/(1-influence(m.lungdisease)$h))^2)
+
+#Smoke+height+Age+Gender+Sport=0.165599
+#model selection step 4
+
+m.bmi<-lm(FEV~Smoke+height+Age+Gender+Sport+BMI, data=data_fev)
+mean((m.bmi$residuals/(1-influence(m.bmi)$h))^2)
+
+m.result<-lm(FEV~Smoke+height+Age+Gender+Sport+SchoolResults, data=data_fev)
+mean((m.result$residuals/(1-influence(m.result)$h))^2)
+
+m.td<-lm(FEV~Smoke+height+Age+Gender+Sport+T1D, data=data_fev)
+mean((m.td$residuals/(1-influence(m.td)$h))^2)
+
+m.colorblind<-lm(FEV~Smoke+height+Age+Gender+Sport+ColorBlind, data=data_fev)
+mean((m.colorblind$residuals/(1-influence(m.colorblind)$h))^2)
+
+m.sportdays<-lm(FEV~Smoke+height+Age+Gender+Sport+SportDays, data=data_fev)
+mean((m.sportdays$residuals/(1-influence(m.sportdays)$h))^2)
+
+m.lungdisease<-lm(FEV~Smoke+height+Age+Gender+Sport+LungDisease, data=data_fev)
+mean((m.lungdisease$residuals/(1-influence(m.lungdisease)$h))^2)
+
+# Smoke+height+Age+Gender+Sport+T1D=0.1615807
+#model selection step 5 BMI+SchoolResults+ColorBlind+SportDays
+
+m.bmi<-lm(FEV~Smoke+height+Age+Gender+Sport+T1D+BMI, data=data_fev)
+mean((m.bmi$residuals/(1-influence(m.bmi)$h))^2)
+
+m.result<-lm(FEV~Smoke+height+Age+Gender+Sport+T1D+SchoolResults, data=data_fev)
+mean((m.result$residuals/(1-influence(m.result)$h))^2)
+
+m.colorblind<-lm(FEV~Smoke+height+Age+Gender+Sport+T1D+ColorBlind, data=data_fev)
+mean((m.colorblind$residuals/(1-influence(m.colorblind)$h))^2)
+
+m.sportdays<-lm(FEV~Smoke+height+Age+Gender+Sport+T1D+SportDays, data=data_fev)
+mean((m.sportdays$residuals/(1-influence(m.sportdays)$h))^2)
+
+m.lungdisease<-lm(FEV~Smoke+height+Age+Gender+Sport+T1D+LungDisease, data=data_fev)
+mean((m.lungdisease$residuals/(1-influence(m.lungdisease)$h))^2)
+
+```
+
+## Non-Additive Model(Adjusted Analysis)
+
+```{r }
+model<-lm(FEV~(Smoke+height+Age+Gender+Sport+T1D+LungDisease+
+                 Smoke*Age+Smoke*Gender+LungDisease*Sport), data=data_fev)
+```
+
+## Model Assumptions
+```{r echo=FALSE}
+plot(model, which =2 )
+```
+
+The plot deviated from the reference line at tail and head. The normality plot shows heavy tails on both ends.There is extreme observation at the top and not clearly indicated whether normality assumption met or not. 
+
+```{r echo=FALSE}
+res <-ggplot(model, aes(.fitted, .resid))+geom_point()+     
+  geom_smooth()+
+  geom_hline(yintercept=0, col="red", linetype="dashed", size= 1)+
+  labs(x="Fitted value",y=" Residuals")+
+  theme_bw();res
+```
+
+```{r}
+model1<-lm(FEV~(Smoke+height+I(height^2)+Age+Gender+Sport+
+                  T1D+LungDisease+Smoke*Age+Smoke*Gender+LungDisease*Sport), data=data_fev)
+```
+ 
+```{r echo=FALSE}
+
+res <-ggplot(model1, aes(.fitted, .resid))+geom_point()+     
+  geom_smooth()+
+  geom_hline(yintercept=0, col="red", linetype="dashed", size= 1)+
+  labs(x="Fitted value",y=" Residuals")+
+  theme_bw();res
+```
+From the above plot the fitted blue line seems a linear. The points are also systematicaly distributed and variance is seems like a constant
+
+```{r echo=FALSE}
+plot(model1 )
+
+```
+
+## Multicolliearity
+
+```{r echo=FALSE}
+library(car)
+vif(lm(FEV~(Smoke+height+Age+Gender+Sport+T1D+LungDisease), data=data_fev))
+```
+
+## Leverage
+```{r echo=FALSE}
+h<-influence(model1)$h
+plot(h,xlab="obesrvation",ylab="leverage",cex.axis=1.5,cex.lab=1.5)
+abline(h=sum(h)/nrow(data_fev[NA,]),lty=2)
+# Bonferonni test
+outlierTest(model1) 
+```
+
+## Transformed model
+
+```{r}
+model1<-lm(FEV~(Smoke+height+I(height^2)+Age+Gender+Sport+T1D+LungDisease+
+                  Smoke*Age+Smoke*Gender+LungDisease*Sport), data=data_fev)
+summary(model1)
+confint(model1)
+```
+
+```{r include=FALSE}
+#2nd research que begins code
+fev1 <- data_fev %>%
+  mutate(Gender = as.factor(Gender)) %>%
+  mutate(ParentSmoke = as.factor(ParentSmoke)) %>%
+  mutate(height)
+```
+## Exploratory Data Analysis
+
+```{r echo=FALSE, warning=FALSE}
+fev1 %>%
+  ggplot(aes(x=ParentSmoke,y=FEV,fill=ParentSmoke)) +
+  scale_fill_manual(values=c("dimgrey","firebrick")) +
+  theme_bw()+
+  geom_boxplot(outlier.shape=NA) + 
+  geom_jitter(width = 0.2, size=0.1) +
+  ylab("FEV") +
+  xlab("Parentsmoke status")
+```
+
+```{r echo=FALSE, warning=FALSE}
+
+```
+
+```{r echo=FALSE, warning=FALSE}
+data_fev %>% select(Age,Gender,height,ParentSmoke,SES,MotherEdu,Smoke, Sport, T1D, LungDisease, FEV) %>%
+ggpairs()
+
+```
+
+## Unadjusted Analysis
+
+```{r}
+m<-lm(FEV~ParentSmoke,data=data_fev)
+summary(m)
+```
+
+## Non-Additive Model(Adjusted Analysis)
+
+```{r}
+modelA<-lm(FEV~ParentSmoke+height+Age+Gender+Sport+T1D+LungDisease+SES+MotherEdu+Smoke*Age+Smoke*Gender+Sport*LungDisease,data=data_fev)
+```
+
+## Model Assumptions
+```{r echo=FALSE}
+plot(modelA, which =2 )
+```
+
+```{r echo=FALSE}
+
+res <-ggplot(modelA, aes(.fitted, .resid))+geom_point()+     
+  geom_smooth()+
+  geom_hline(yintercept=0, col="red", linetype="dashed", size= 1)+
+  labs(x="Fitted value",y=" Residuals")+
+  theme_bw();res
+```
+
+```{r}
+modelA1<-lm(FEV~(ParentSmoke+Smoke+height+I(height^2)+Age+Gender+Sport+
+                  T1D+LungDisease+SES+MotherEdu+Smoke*Age+Smoke*Gender+LungDisease*Sport), data=data_fev)
+```
+
+```{r echo=FALSE}
+res <-ggplot(modelA1, aes(.fitted, .resid))+geom_point()+     
+  geom_smooth()+
+  geom_hline(yintercept=0, col="red", linetype="dashed", size= 1)+
+  labs(x="Fitted value",y=" Residuals")+
+  theme_bw();res
+```
+
+```{r echo=FALSE}
+plot(modelA1, which =2 )
+```
+
+## Multicolliearity
+
+```{r echo=FALSE}
+vif(lm(FEV~(ParentSmoke+Smoke+height+Age+Gender+Sport+T1D+LungDisease+SES+MotherEdu), data=data_fev))
+```
+
+## Leverage
+```{r echo=FALSE}
+h<-influence(modelA1)$h
+plot(h,xlab="obesrvation",ylab="leverage",cex.axis=1.5,cex.lab=1.5)
+abline(h=sum(h)/nrow(data_fev[NA,]),lty=2)
+# Bonferonni test
+outlierTest(modelA1) 
+```
+
+## Transformed model
+
+```{r}
+summary(modelA1)
+confint(modelA1)
+```
+
+# Appendix
+
+```{r ref.label=knitr::all_labels(), echo=TRUE, eval=FALSE}
+```
+
